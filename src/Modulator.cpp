@@ -29,6 +29,7 @@ source distribution.
 
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
 /*
 48khz mono
@@ -44,7 +45,10 @@ namespace
     const u16 highFreq = 2400u;
     const int maxVol = 30000;
 
-    const u16 duration = 4800;
+    const u16 duration = 48;
+
+    const std::size_t maxSegmentSize = 1200;
+    const std::size_t maxSegmentCount = 32;
 
     //wave tables
     std::vector<short> lowTable;
@@ -65,7 +69,7 @@ namespace
     }
 }
 
-bool Modulator::modulate(const std::vector<byte>& data)
+bool Modulator::modulate(const std::vector<byte>& data, const std::string& fileName)
 {
     //check if wave tables built and create if not
     if (lowTable.empty() || highTable.empty())
@@ -75,35 +79,57 @@ bool Modulator::modulate(const std::vector<byte>& data)
     }
     
     //create ostream / check valid
-    std::fstream file("test.wav", std::ios::binary | std::ios::out);
+    std::fstream file(fileName, std::ios::binary | std::ios::out);
     if (!file.good() || !file.is_open())
     {
         std::cout << "Failed to open file for writing" << std::endl;
         file.close();
         return false;
     }
+    std::cout << "Processing..." << std::endl;
+
+    //test data size and limit if necessary
+    auto dataSize = data.size() * highTable.size();
+    auto segmentCount = std::min(dataSize / maxSegmentSize, maxSegmentCount);
+    dataSize = segmentCount * maxSegmentSize * 8 * highTable.size();
 
     //create header
     WavHeader header;
 
-    //process data
-    std::vector<short> ndata(200 * lowTable.size());
-    auto ptr = ndata.data();
-    for (int i = 0; i < 200; ++i)
+    //add to header / update header data count - riffChuknSize and dataChunkSize
+    header.riffChunkSize += dataSize;
+    header.dataChunkSize = dataSize;
+
+    file.write((const char*)&header, sizeof(header));
+
+    //output segments
+    for (auto i = 0; i < segmentCount; ++i)
     {
-        std::memcpy((void*)ptr, lowTable.data(), lowTable.size());
-        ptr += lowTable.size();
+        std::vector<short> outData(maxSegmentSize * 8 * highTable.size());
+        auto ptr = outData.data();
+
+        for (auto j = 0u; j < maxSegmentSize; ++j)
+        {
+            for (auto k = 0; k < 8; ++k)
+            {
+                if (data[j] & (1 << k))
+                {
+                    std::memcpy((void*)ptr, lowTable.data(), lowTable.size() * sizeof(short));
+                    ptr += lowTable.size();
+                }
+                else
+                {
+                    std::memcpy((void*)ptr, highTable.data(), highTable.size() * sizeof(short));
+                    ptr += highTable.size();
+                }
+            }
+        }
+        file.write((const char*)outData.data(), outData.size() * sizeof(short));
     }
 
-    //add to header / update header data count - riffChuknSize and dataChunkSize
-    header.riffChunkSize += sizeof(lowTable);
-    header.dataChunkSize = sizeof(lowTable);
-
-    //output via stream
-    file.write((const char*)&header, sizeof(header));
-    file.write((const char*)ndata.data(), sizeof(data));
-
     file.close();
+
+    std::cout << "wrote " << dataSize << "bytes" << std::endl;
 
     return true;
 }

@@ -40,7 +40,7 @@ class Modulator final
 {
 public:
 
-    static bool modulate(const std::vector<byte>& data);
+    static bool modulate(const std::vector<byte>& data, const std::string& outFile);
 
 private:
 

@@ -32,7 +32,7 @@ source distribution.
 
 namespace
 {
-    const int maxFileSize = 1024 * 1024 * 4; //never read more than 4MB
+    const int maxFileSize = 1024 * 1024; //never read more than 1MB
 }
 
 

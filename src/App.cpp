@@ -45,13 +45,16 @@ int App::run(int argsc, char** argsv)
         return 2;
     }
 
-    if (!Modulator::modulate(fd.getData()))
+    std::cout << "Enter file name:" << std::endl;
+    std::string fileName;
+    std::cin >> fileName;
+    if (fileName.empty()) fileName = "default.wav";
+    if (fileName.find_last_of(".wav") != fileName.size() - 1) fileName += ".wav";
+
+    if (!Modulator::modulate(fd.getData(), fileName))
     {
         return 3;
     }
-
-    char t;
-    std::cin >> t;
 
     return 0;
 }
